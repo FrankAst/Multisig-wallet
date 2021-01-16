@@ -1,0 +1,108 @@
+pragma solidity >=0.7.0 <0.8.0;
+import "./creator.sol";
+
+contract MultiSig is ownable3 {
+    
+    //Variables declaration
+    
+    struct  owner{
+        string name;
+        address addr;
+    }
+    
+    owner[3] dudes;
+    uint8 count=0;
+    // mapping(address => uint256) balanceOf;      // keeps track of historic deposits
+    mapping(address => bool) Signed;            // approval signature for owner's addresses
+    
+    // @We initialise the sign in false.
+    constructor(){
+        for(uint8 p=0; p<3; p++){
+            Signed[dudes[p].addr]= false;
+        }
+    }
+    
+    // @Here we set up the modifier and an error handling function.
+    
+     function ErrorMsg() public pure returns(string memory){
+        string memory k= "you are not an owner";
+        return k;
+    }
+    
+    
+    modifier OnlyOwners() {
+        if(msg.sender == dudes[0].addr || msg.sender == dudes[1].addr || msg.sender == dudes[2].addr){
+            _;
+        } else{
+            ErrorMsg;
+        }
+    }
+    
+    // @Events 
+    
+    event NewDeposit(address _from, uint _amount);
+    event OwnerSign(address _owner);
+    event withdrawBy(address _withdrawer);
+                                            ////////////////////////
+                                            
+                                            
+    // @The creator/deployer sets who the owners are
+    function SetOwners(string memory _name, address _addr, uint _index) external CreatorOnly{
+            dudes[_index].name = _name;
+            dudes[_index].addr = _addr;
+    }
+    
+    // @Get who the owners are atm
+    function getOwners() public view returns(string memory,string memory,string memory){
+                    return (dudes[0].name, dudes[1].name, dudes[2].name);
+        
+    }
+    
+                                           /////////////////////////
+                                            // @MAIN BODY //
+    
+    function deposit() payable public {
+       // balanceOf[msg.sender] += msg.value;
+       emit NewDeposit(msg.sender, msg.value);
+    }
+    
+    function getBalance() public view returns(uint){
+       return address(this).balance;
+    }
+    
+    // @Owner agrees on withdrawal by signing
+    
+    function sign() public OnlyOwners {
+        require(Signed[msg.sender] == false);
+        Signed[msg.sender] = true;
+        emit OwnerSign(msg.sender);
+    }
+    
+    // @Warns that less than 2 owners agree on withdrawal
+    
+    function ErrorM() private pure returns(string memory){
+        string memory p= "2 signatures are required to withdraw";
+        return p;
+    }
+    
+    function withdraw(uint _amount) public OnlyOwners {
+        for(uint8 i=0; i<3; i++){                                               // counts the amount of approvals in "count"
+                if(dudes[i].addr != msg.sender && Signed[dudes[i].addr]){
+                count++;
+                }
+        }
+        if(count >= 2 && _amount<= address(this).balance){                     // if we have more than 2 approvals then we do the transfer to the sender.
+            msg.sender.transfer(_amount);
+            emit withdrawBy(msg.sender);
+            for(uint8 j=0; j<3; j++){                                           // here we set the permission back to not Signed because the Tx was already sent.
+                Signed[dudes[j].addr] = false;
+                
+                }
+            count=0;                                                            // we return the contract's balance 
+            getBalance();
+            } else{
+            ErrorM;
+        }
+    }
+    
+}
